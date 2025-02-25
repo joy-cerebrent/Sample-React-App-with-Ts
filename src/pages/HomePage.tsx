@@ -1,14 +1,17 @@
 import { ReactElement, useState } from "react";
+import { Bot } from "lucide-react";
 
 import Table from "../components/Dashboard/Table";
 import Topbar from "../components/Dashboard/Topbar";
+import PromptInput from "../components/PromptInput";
 import StatCard from "../components/Dashboard/StatCard";
 import BarChartComponent from "../components/Dashboard/BarChart";
 import PieChartComponent from "../components/Dashboard/PieChart";
 import LineChartComponent from "../components/Dashboard/LineChart";
 import RadarChartComponent from "../components/Dashboard/RadarChart";
-import { Bot } from "lucide-react";
-import PromptInput from "../components/PromptInput";
+
+import { Spreadsheet } from "../../../utility-package/dist";
+import wait from "../utils/wait";
 
 const stats: {
   title: string;
@@ -40,8 +43,13 @@ const stats: {
     },
   ];
 
+const handleSave = async (jsonData: any[][]) => {
+  await wait(2000);
+  console.log("Sending JSON data:", jsonData);
+};
+
 const componentMap: {
-  [key: string]: (index: number, data: any) => ReactElement;
+  [key: string]: (index: number, data: any, types?: any) => ReactElement;
 } = {
   pie: (index, data) => (
     <PieChartComponent key={index} title="Device Usage" data={data} cols={4} />
@@ -58,6 +66,15 @@ const componentMap: {
   table: (index, data) => (
     <Table key={index} data={data} title="Dynamic Table" cols={12} />
   ),
+  spreadsheet: (index, data, types) => (
+    <div className="grid-cols-12" key={index}>
+      <Spreadsheet
+        onSave={handleSave}
+        tableColumns={types}
+        tableData={data}
+      />
+    </div>
+  )
 };
 
 const HomePage = () => {
@@ -78,13 +95,15 @@ const HomePage = () => {
         }
       );
 
-      const { mode: responseMode, components: newComponents } =
-        await response.json();
+      const { mode: responseMode, components: newComponents } = await response.json();
 
       const updatedComponents = newComponents.map((component: any) => ({
         type: component.type,
         data: component.data,
+        types: component.types ?? null,
       }));
+
+      console.log(updatedComponents)
 
       setMode(responseMode);
       setComponents((prev) =>
@@ -126,8 +145,8 @@ const HomePage = () => {
             />
           ))}
 
-          {components.map(({ type, data }, index) =>
-            componentMap[type] ? componentMap[type](index, data) : null
+          {components.map(({ type, data, types }, index) =>
+            componentMap[type] ? componentMap[type](index, data, types) : null
           )}
         </div>
       </div>

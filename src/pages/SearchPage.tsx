@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
-import { useFetch } from "../hooks/useFetch";
-import { useDebounce } from "../hooks/useDebounce";
+// import { useFetch } from "../hooks/useFetch";
+import { useFetch } from "../../../utility-package/dist";
+// import { useDebounce } from "../hooks/useDebounce";
+import { useDebounce } from "../../../utility-package/dist";
 
 const SearchPage = () => {
   const [query, setQuery] = useState<string>("");

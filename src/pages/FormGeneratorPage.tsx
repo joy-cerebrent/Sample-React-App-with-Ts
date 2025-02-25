@@ -7,10 +7,68 @@ import PromptInput from "../components/PromptInput";
 import { NotepadText } from "lucide-react";
 import Input from "../components/Form/Input";
 import Button from "../components/Form/Button";
+import Textarea from "../components/Form/Textarea";
+import { FileUploader } from "../../../utility-package/dist";
 
 const convertToCapitalized = (str: string) => {
   return str.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/\b\w/g, (char) => char.toUpperCase());
 };
+
+const handleUpload = async (files: File[]) => {
+  console.log("Uploading Files : ", files);
+
+  await new Promise((resolve, _reject) => setTimeout(resolve, 2000));
+
+  console.log("Upload Complete");
+}
+
+const componentMap: {
+  [key: string]: (field: any, register: any, errors: any) => React.ReactNode;
+} = {
+  text: (field, register, errors) => (
+    <Input
+      label={convertToCapitalized(field.name)}
+      type="text"
+      placeholder={`Enter ${convertToCapitalized(field.name)}`}
+      registration={register(field.name)}
+      error={errors[field.name]?.message as string}
+    />
+  ),
+  email: (field, register, errors) => (
+    <Input
+      label={convertToCapitalized(field.name)}
+      type="email"
+      placeholder="Enter your email"
+      registration={register(field.name)}
+      error={errors[field.name]?.message as string}
+    />
+  ),
+  password: (field, register, errors) => (
+    <Input
+      label={convertToCapitalized(field.name)}
+      type="password"
+      placeholder="Enter your password"
+      registration={register(field.name)}
+      error={errors[field.name]?.message as string}
+    />
+  ),
+  description: (field, register, errors) => (
+    <Textarea
+      label={convertToCapitalized(field.name)}
+      placeholder="Enter description..."
+      registration={register(field.name)}
+      error={errors[field.name]?.message as string}
+    />
+  ),
+  fileUploader: (field, register, errors) => (
+    <FileUploader
+      onUpload={handleUpload}
+    // registration={register(field.name)}
+    // error={errors[field.name]?.message as string}
+    />
+  ),
+};
+
 
 const FormGeneratorPage: React.FC = () => {
   const [prompt, setPrompt] = useState<string>("");
@@ -119,13 +177,9 @@ const FormGeneratorPage: React.FC = () => {
             <h2 className="text-lg font-medium mb-4">Your generated Form</h2>
             {components.map((component) => (
               <div key={component.name} className="mb-3">
-                <Input
-                  label={convertToCapitalized(component.name)}
-                  type={component.type ?? "text"}
-                  placeholder={`Enter ${convertToCapitalized(component.name)}`}
-                  registration={register(component.name)}
-                  error={errors[component.name]?.message as string}
-                />
+                {componentMap[component.type]
+                  ? componentMap[component.type](component, register, errors)
+                  : componentMap["text"](component, register, errors)}
               </div>
             ))}
 
