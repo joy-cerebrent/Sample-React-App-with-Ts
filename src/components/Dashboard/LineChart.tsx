@@ -1,6 +1,4 @@
-"use client";
-
-import { LucideIcon, User } from "lucide-react";
+import { User } from "lucide-react";
 import {
   XAxis,
   YAxis,

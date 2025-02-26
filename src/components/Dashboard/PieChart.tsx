@@ -1,6 +1,3 @@
-"use client";
-
-import React from "react";
 import {
   PieChart,
   Pie,
@@ -42,7 +39,7 @@ export default function PieChartComponent({
               outerRadius={80}
               fill="#5b21b6"
             >
-              {data.map((entry: any, index: number) => (
+              {data.map((_entry: any, index: number) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
               ))}
             </Pie>

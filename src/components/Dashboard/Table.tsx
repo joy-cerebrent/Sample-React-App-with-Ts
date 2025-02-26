@@ -1,5 +1,4 @@
 import { ArrowUpRight, DollarSign, MoreHorizontal } from "lucide-react";
-import React from "react";
 
 export default function Table({ data, title, cols }: { data: any, title: string; cols: number; }) {
   const keys = Array.from(Object.keys(data[0]));

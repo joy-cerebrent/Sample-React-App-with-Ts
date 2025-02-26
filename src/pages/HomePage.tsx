@@ -1,14 +1,23 @@
 import { ReactElement, useState } from "react";
 import { Bot } from "lucide-react";
 
-import Table from "../components/Dashboard/Table";
-import Topbar from "../components/Dashboard/Topbar";
+import Topbar from "../components/Topbar";
 import PromptInput from "../components/PromptInput";
-import StatCard from "../components/Dashboard/StatCard";
-import BarChartComponent from "../components/Dashboard/BarChart";
-import PieChartComponent from "../components/Dashboard/PieChart";
-import LineChartComponent from "../components/Dashboard/LineChart";
-import RadarChartComponent from "../components/Dashboard/RadarChart";
+import {
+  BarChartComponent,
+  PieChartComponent,
+  LineChartComponent,
+  RadarChartComponent,
+  StatCard,
+  Table,
+} from "utility-package/graphs";
+
+// import StatCard from "../components/Dashboard/StatCard";
+// import Table from "../components/Dashboard/Table";
+// import BarChartComponent from "../components/Dashboard/BarChart";
+// import PieChartComponent from "../components/Dashboard/PieChart";
+// import LineChartComponent from "../components/Dashboard/LineChart";
+// import RadarChartComponent from "../components/Dashboard/RadarChart";
 
 import { Spreadsheet } from "../../../utility-package/dist";
 import wait from "../utils/wait";
