@@ -1,5 +1,5 @@
 import { useFetch } from "../hooks/useFetch";
-import { SocketContextProvider, useSocketContext } from "../providers/SocketProvider";
+import { SocketContextProvider, useSocketContext } from "utility-package/providers";
 import { useEffect, useState } from "react";
 
 interface Data {
@@ -38,6 +38,20 @@ const SocketPageContent = () => {
       setData(fetchedData as Data);
     }
   }, [fetchedData]);
+
+  useEffect(() => {
+    if(!socket) return;
+
+    const handleIncomingData = (newData: Data) => {
+      setData(newData);
+    }
+
+    socket.on("dataUpdated", handleIncomingData);
+
+    return () => {
+      socket.off("dataUpdated", handleIncomingData);
+    }
+  }, [socket]);
 
   const handleUpdate = () => {
     if (socket) {

@@ -1,6 +1,5 @@
-import { ReactElement, useState } from "react";
+import React, { ReactElement, useEffect, useState } from "react";
 import { Bot } from "lucide-react";
-
 import Topbar from "../components/Topbar";
 import PromptInput from "../components/PromptInput";
 import {
@@ -12,45 +11,9 @@ import {
   Table,
 } from "utility-package/graphs";
 
-// import StatCard from "../components/Dashboard/StatCard";
-// import Table from "../components/Dashboard/Table";
-// import BarChartComponent from "../components/Dashboard/BarChart";
-// import PieChartComponent from "../components/Dashboard/PieChart";
-// import LineChartComponent from "../components/Dashboard/LineChart";
-// import RadarChartComponent from "../components/Dashboard/RadarChart";
-
+import { useSocketContext, SocketContextProvider } from "utility-package/providers";
 import { Spreadsheet } from "../../../utility-package/dist";
 import wait from "../utils/wait";
-
-const stats: {
-  title: string;
-  value: string;
-  pillText: string;
-  trend: "up" | "down";
-  period: string;
-}[] = [
-    {
-      title: "Gross Revenue",
-      value: "$120,054.24",
-      pillText: "2.75%",
-      trend: "up",
-      period: "From Jan 1st - Jul 31st",
-    },
-    {
-      title: "Avg Order",
-      value: "$27.97",
-      pillText: "1.01%",
-      trend: "down",
-      period: "From Jan 1st - Jul 31st",
-    },
-    {
-      title: "Trailing Year",
-      value: "$278,054.24",
-      pillText: "60.75%",
-      trend: "up",
-      period: "Previous 365 days",
-    },
-  ];
 
 const handleSave = async (jsonData: any[][]) => {
   await wait(2000);
@@ -60,33 +23,36 @@ const handleSave = async (jsonData: any[][]) => {
 const componentMap: {
   [key: string]: (index: number, data: any, types?: any) => ReactElement;
 } = {
-  pie: (index, data) => (
-    <PieChartComponent key={index} title="Device Usage" data={data} cols={4} />
+  cards: (index, data) => (
+    <React.Fragment key={index}>
+      {data.map((stat: any, i: number) => (
+        <StatCard key={i} title={stat.title} value={stat.value} pillText={stat.pillText} trend={stat.trend} period={stat.period} cols={4} />
+      ))}
+    </React.Fragment>
   ),
-  bar: (index, data) => (
-    <BarChartComponent key={index} title="Monthly Sales" data={data} cols={8} />
-  ),
-  radar: (index, data) => (
-    <RadarChartComponent key={index} title="Usage Radar" data={data} cols={4} />
-  ),
-  line: (index, data) => (
-    <LineChartComponent key={index} title="Bar Activity" data={data} cols={8} />
-  ),
-  table: (index, data) => (
-    <Table key={index} data={data} title="Dynamic Table" cols={12} />
-  ),
-  spreadsheet: (index, data, types) => (
-    <div className="grid-cols-12" key={index}>
-      <Spreadsheet
-        onSave={handleSave}
-        tableColumns={types}
-        tableData={data}
-      />
-    </div>
-  )
+  pie: (index, data) => <PieChartComponent key={index} title="Device Usage" data={data} cols={4} />,
+  bar: (index, data) => <BarChartComponent key={index} title="Monthly Sales" data={data} cols={8} />,
+  radar: (index, data) => <RadarChartComponent key={index} title="Usage Radar" data={data} cols={4} />,
+  line: (index, data) => <LineChartComponent key={index} title="Bar Activity" data={data} cols={8} />,
+  table: (index, data) => <Table key={index} data={data} title="Dynamic Table" cols={12} />,
+  // spreadsheet: (index, data, types) => (
+  //   <React.Fragment key={index}>
+  //     <Spreadsheet onSave={handleSave} tableColumns={types} tableData={data} />
+  //   </React.Fragment>
+  // ),
 };
 
 const HomePage = () => {
+  return (
+    <SocketContextProvider serverUrl="http://localhost:4000">
+      <HomePageContent />
+    </SocketContextProvider>
+  );
+};
+
+const HomePageContent = () => {
+  const socket = useSocketContext();
+
   const [loading, setLoading] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [components, setComponents] = useState<any[]>([]);
@@ -95,14 +61,11 @@ const HomePage = () => {
   const handlePromptSubmit = async () => {
     setLoading(true);
     try {
-      const response = await fetch(
-        "http://localhost:4000/api/dashboard/generate-components",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt }),
-        }
-      );
+      const response = await fetch("http://localhost:4000/api/dashboard/generate-components", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
 
       const { mode: responseMode, components: newComponents } = await response.json();
 
@@ -112,14 +75,10 @@ const HomePage = () => {
         types: component.types ?? null,
       }));
 
-      console.log(updatedComponents)
+      console.log(updatedComponents);
 
       setMode(responseMode);
-      setComponents((prev) =>
-        responseMode === "replace"
-          ? updatedComponents
-          : [...prev, ...updatedComponents]
-      );
+      setComponents((prev) => (responseMode === "replace" ? updatedComponents : [...prev, ...updatedComponents]));
       setPrompt("");
     } catch (error) {
       console.error("Error generating components:", error);
@@ -128,9 +87,35 @@ const HomePage = () => {
     }
   };
 
+  useEffect(() => {
+    if (!socket) return;
+
+    console.log("Socket connected : ", socket)
+
+    const setUpdatedData = (newComponents: any) => {
+      setComponents((prevComponents) => {
+        console.log("Previous components:", prevComponents);
+        console.log("New components:", newComponents);
+
+        const existingComponentTypes = prevComponents.map(c => c.type);
+
+        const filteredComponents = newComponents.filter((c: any) => existingComponentTypes.includes(c.type));
+
+        return filteredComponents;
+      });
+    };
+
+    socket.on("updateDashboardData", setUpdatedData);
+
+    return () => {
+      socket.off("updateDashboardData", setUpdatedData);
+    };
+  }, [socket]);
+
   return (
     <div className="bg-white rounded-xl pb-4 shadow">
       <Topbar />
+
       <div className="px-4">
         <PromptInput
           icon={Bot}
@@ -142,21 +127,9 @@ const HomePage = () => {
         />
 
         <div className="grid gap-3 grid-cols-12">
-          {stats.map(({ title, value, pillText, trend, period }) => (
-            <StatCard
-              key={title}
-              title={title}
-              value={value}
-              pillText={pillText}
-              trend={trend}
-              period={period}
-              cols={4}
-            />
-          ))}
-
-          {components.map(({ type, data, types }, index) =>
+          {components.map(({ type, data, types }, index) => (
             componentMap[type] ? componentMap[type](index, data, types) : null
-          )}
+          ))}
         </div>
       </div>
     </div>
