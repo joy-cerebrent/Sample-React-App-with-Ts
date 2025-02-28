@@ -1,5 +1,5 @@
 import { LoaderCircle } from "lucide-react";
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 
 interface PromptInputProps {
   icon: React.ElementType;
@@ -18,7 +18,7 @@ export default function PromptInput({
   handlePromptSubmit,
   loading,
 }: PromptInputProps) {
-  const [isFocused, setIsFocused] = useState<boolean>(false);
+  // const [isFocused, setIsFocused] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -33,7 +33,7 @@ export default function PromptInput({
         inputRef.current?.blur();
       }
 
-      if (event.key === "Enter") {
+      if (event.key === "Enter" && document.activeElement === inputRef.current) {
         event.preventDefault();
         handlePromptSubmit();
         inputRef.current?.blur();
@@ -63,8 +63,8 @@ export default function PromptInput({
           type="text"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
+          // onFocus={() => setIsFocused(true)}
+          // onBlur={() => setIsFocused(false)}
           placeholder={placeholder}
           className="w-full bg-transparent placeholder:text-stone-400 focus:outline-none"
         />
