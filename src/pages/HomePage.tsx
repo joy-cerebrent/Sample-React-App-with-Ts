@@ -11,36 +11,46 @@ import {
   Table,
 } from "utility-package/graphs";
 
+import { Dropdown } from "utility-package/form";
+
 import { useSocketContext, SocketContextProvider } from "utility-package/providers";
 import { Spreadsheet } from "../../../utility-package/dist";
-import wait from "../utils/wait";
-
-const handleSave = async (jsonData: any[][]) => {
-  await wait(2000);
-  console.log("Sending JSON data:", jsonData);
-};
+import DynamicChartWrapper from "../components/Dashboard/DynamicChartWrapper";
+import InitialDynamicChart from "../components/Dashboard/InitialDynamicChart";
 
 const componentMap: {
   [key: string]: (index: number, data: any, types?: any) => ReactElement;
 } = {
-  cards: (index, data) => (
-    <React.Fragment key={index}>
-      {data.map((stat: any, i: number) => (
-        <StatCard key={i} title={stat.title} value={stat.value} pillText={stat.pillText} trend={stat.trend} period={stat.period} cols={4} />
-      ))}
-    </React.Fragment>
-  ),
-  pie: (index, data) => <PieChartComponent key={index} title="Device Usage" data={data} cols={4} />,
-  bar: (index, data) => <BarChartComponent key={index} title="Monthly Sales" data={data} cols={8} />,
-  radar: (index, data) => <RadarChartComponent key={index} title="Usage Radar" data={data} cols={4} />,
-  line: (index, data) => <LineChartComponent key={index} title="Bar Activity" data={data} cols={8} />,
-  table: (index, data) => <Table key={index} data={data} title="Dynamic Table" cols={12} />,
   // spreadsheet: (index, data, types) => (
   //   <React.Fragment key={index}>
   //     <Spreadsheet onSave={handleSave} tableColumns={types} tableData={data} />
   //   </React.Fragment>
   // ),
 };
+
+export type chartType = "cards" | "bar" | "pie" | "radar" | "pie" | "donut" | "nightingale" | "line" | "area" | "radar" | "scatter" | "treemap";
+
+export type kpiCardType = {
+  title: string;
+  value: string;
+  pillText: string;
+  trend: "up" | "down";
+  period: string;
+};
+
+export type chartDataType = {
+  name: string;
+  value: number;
+};
+
+export type ComponentType = {
+  title: string;
+  type: chartType;
+  cols?: number;
+  recommededTypes?: Array<chartType>;
+  allTypes?: Array<chartType>;
+  data: Array<kpiCardType | chartDataType>;
+}
 
 const HomePage = () => {
   return (
@@ -55,8 +65,11 @@ const HomePageContent = () => {
 
   const [loading, setLoading] = useState(false);
   const [prompt, setPrompt] = useState("");
-  const [components, setComponents] = useState<any[]>([]);
+  const [components, setComponents] = useState<Array<ComponentType>>([]);
   const [mode, setMode] = useState<"append" | "replace">("append");
+
+  const [initialLoadData, setInitialLoadData] = useState([]);
+  const [initialComponent, setInitialComponent] = useState<any | null>(null);
 
   const handlePromptSubmit = async () => {
     setLoading(true);
@@ -70,15 +83,23 @@ const HomePageContent = () => {
       const { mode: responseMode, components: newComponents } = await response.json();
 
       const updatedComponents = newComponents.map((component: any) => ({
-        type: component.type,
+        title: component.title,
+        type: component.defaultType,
+        cols: component.cols,
+        recommededTypes: component.recommededTypes,
+        allTypes: component.allTypes,
         data: component.data,
-        types: component.types ?? null,
       }));
 
-      console.log(updatedComponents);
-
       setMode(responseMode);
-      setComponents((prev) => (responseMode === "replace" ? updatedComponents : [...prev, ...updatedComponents]));
+      setComponents((prev) => (responseMode === "replace"
+        ? updatedComponents
+        : [
+          ...prev,
+          ...updatedComponents
+        ])
+      );
+
       setPrompt("");
     } catch (error) {
       console.error("Error generating components:", error);
@@ -90,16 +111,20 @@ const HomePageContent = () => {
   useEffect(() => {
     if (!socket) return;
 
-    console.log("Socket connected : ", socket)
-
     const setUpdatedData = (newComponents: any) => {
       setComponents((prevComponents) => {
-        console.log("Previous components:", prevComponents);
-        console.log("New components:", newComponents);
+        const existingComponentTypes = prevComponents.map(c => c.title);
 
-        const existingComponentTypes = prevComponents.map(c => c.type);
-
-        const filteredComponents = newComponents.filter((c: any) => existingComponentTypes.includes(c.type));
+        const filteredComponents = newComponents
+          .filter((c: any) => existingComponentTypes.includes(c.title))
+          .map((c: any) => ({
+            title: c.title,
+            type: c.defaultType || "bar",
+            cols: c.cols || 6,
+            recommededTypes: c.recommededTypes ?? [],
+            allTypes: c.allTypes ?? [],
+            data: c.data ?? [],
+          }));
 
         return filteredComponents;
       });
@@ -111,6 +136,30 @@ const HomePageContent = () => {
       socket.off("updateDashboardData", setUpdatedData);
     };
   }, [socket]);
+
+  useEffect(() => {
+    const initialLoad = async () => {
+      const response = await fetch("http://localhost:4000/api/dashboard/initial-load", {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+      });
+
+      const { mode, components } = await response.json();
+
+      const formattedComponents = components.map((component: any) => ({
+        title: component.title,
+        type: component.defaultType,
+        cols: component.cols,
+        recommededTypes: component.recommededTypes,
+        allTypes: component.allTypes,
+        data: component.data,
+      }));
+
+      setInitialLoadData(formattedComponents);
+    }
+
+    initialLoad();
+  }, []);
 
   return (
     <div className="bg-white rounded-xl pb-4 shadow">
@@ -126,10 +175,38 @@ const HomePageContent = () => {
           loading={loading}
         />
 
-        <div className="grid gap-3 grid-cols-12">
-          {components.map(({ type, data, types }, index) => (
-            componentMap[type] ? componentMap[type](index, data, types) : null
-          ))}
+        <div className="grid grid-cols-12 gap-2">
+          {components
+            .filter((component) => component.type === "cards")
+            .map((component, index) => (
+              <React.Fragment key={index}>
+                {component.data.map((card: any, i: number) => (
+                  <StatCard key={i} {...card} cols={4} />
+                ))}
+              </React.Fragment>
+            ))}
+
+          {components
+            ?.filter((component) => component.type !== "cards")
+            ?.map((component, index) => (
+              <React.Fragment key={index}>
+                <DynamicChartWrapper
+                  title={component.title}
+                  type={component.type as Exclude<chartType, "cards">}
+                  cols={component.cols || 4}
+                  recommededTypes={component.recommededTypes!}
+                  allTypes={component.allTypes!}
+                  data={component.data as Array<chartDataType>}
+                />
+              </React.Fragment>
+            ))}
+
+
+          {initialLoadData && (
+            <InitialDynamicChart
+              initialLoadData={initialLoadData}
+            />
+          )}
         </div>
       </div>
     </div>

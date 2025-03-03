@@ -18,7 +18,6 @@ export default function PromptInput({
   handlePromptSubmit,
   loading,
 }: PromptInputProps) {
-  // const [isFocused, setIsFocused] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
