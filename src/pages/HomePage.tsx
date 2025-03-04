@@ -1,34 +1,25 @@
-import React, { ReactElement, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Bot } from "lucide-react";
 import Topbar from "../components/Topbar";
 import PromptInput from "../components/PromptInput";
-import {
-  BarChartComponent,
-  PieChartComponent,
-  LineChartComponent,
-  RadarChartComponent,
-  StatCard,
-  Table,
-} from "utility-package/graphs";
-
-import { Dropdown } from "utility-package/form";
-
+import { StatCard } from "utility-package/graphs";
 import { useSocketContext, SocketContextProvider } from "utility-package/providers";
-import { Spreadsheet } from "../../../utility-package/dist";
 import DynamicChartWrapper from "../components/Dashboard/DynamicChartWrapper";
 import InitialDynamicChart from "../components/Dashboard/InitialDynamicChart";
+import ReportDashboardExample from "../components/charts/ReportDashboardExample";
+import { useQuery, useMutation } from "@tanstack/react-query";
 
-const componentMap: {
-  [key: string]: (index: number, data: any, types?: any) => ReactElement;
-} = {
-  // spreadsheet: (index, data, types) => (
-  //   <React.Fragment key={index}>
-  //     <Spreadsheet onSave={handleSave} tableColumns={types} tableData={data} />
-  //   </React.Fragment>
-  // ),
-};
-
-export type chartType = "cards" | "bar" | "pie" | "radar" | "pie" | "donut" | "nightingale" | "line" | "area" | "radar" | "scatter" | "treemap";
+export type chartType =
+  | "cards"
+  | "bar"
+  | "pie"
+  | "radar"
+  | "donut"
+  | "nightingale"
+  | "line"
+  | "area"
+  | "scatter"
+  | "treemap";
 
 export type kpiCardType = {
   title: string;
@@ -50,7 +41,24 @@ export type ComponentType = {
   recommededTypes?: Array<chartType>;
   allTypes?: Array<chartType>;
   data: Array<kpiCardType | chartDataType>;
-}
+};
+
+const fetchInitialData = async () => {
+  const response = await fetch("http://localhost:4000/api/dashboard/initial-load");
+  if (!response.ok) throw new Error("Failed to fetch initial data");
+  return response.json();
+};
+
+const submitPrompt = async (prompt: string) => {
+  const response = await fetch("http://localhost:4000/api/dashboard/generate-components", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+  });
+
+  if (!response.ok) throw new Error("Error generating components");
+  return response.json();
+};
 
 const HomePage = () => {
   return (
@@ -62,26 +70,34 @@ const HomePage = () => {
 
 const HomePageContent = () => {
   const socket = useSocketContext();
-
-  const [loading, setLoading] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [components, setComponents] = useState<Array<ComponentType>>([]);
   const [mode, setMode] = useState<"append" | "replace">("append");
 
-  const [initialLoadData, setInitialLoadData] = useState([]);
-  const [initialComponent, setInitialComponent] = useState<any | null>(null);
+  const {
+    data: initialData,
+    isLoading,
+    error
+  } = useQuery({
+    queryKey: ["initialData"],
+    queryFn: fetchInitialData,
+  });
 
-  const handlePromptSubmit = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch("http://localhost:4000/api/dashboard/generate-components", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt }),
-      });
+  const initialLoadData = initialData?.components.map((component: any) => ({
+    title: component.title,
+    type: component.defaultType,
+    cols: component.cols,
+    recommededTypes: component.recommededTypes,
+    allTypes: component.allTypes,
+    data: component.data,
+  })) ?? [];
 
-      const { mode: responseMode, components: newComponents } = await response.json();
-
+  const {
+    mutate,
+    isPending
+  } = useMutation({
+    mutationFn: submitPrompt,
+    onSuccess: ({ mode: responseMode, components: newComponents }) => {
       const updatedComponents = newComponents.map((component: any) => ({
         title: component.title,
         type: component.defaultType,
@@ -92,28 +108,24 @@ const HomePageContent = () => {
       }));
 
       setMode(responseMode);
-      setComponents((prev) => (responseMode === "replace"
-        ? updatedComponents
-        : [
-          ...prev,
-          ...updatedComponents
-        ])
+      setComponents((prev) =>
+        mode === "replace" ? updatedComponents : [...prev, ...updatedComponents]
       );
-
       setPrompt("");
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error("Error generating components:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
+
+  const handlePromptSubmit = () => mutate(prompt);
 
   useEffect(() => {
     if (!socket) return;
 
     const setUpdatedData = (newComponents: any) => {
       setComponents((prevComponents) => {
-        const existingComponentTypes = prevComponents.map(c => c.title);
+        const existingComponentTypes = prevComponents.map((c) => c.title);
 
         const filteredComponents = newComponents
           .filter((c: any) => existingComponentTypes.includes(c.title))
@@ -131,35 +143,10 @@ const HomePageContent = () => {
     };
 
     socket.on("updateDashboardData", setUpdatedData);
-
     return () => {
       socket.off("updateDashboardData", setUpdatedData);
     };
   }, [socket]);
-
-  useEffect(() => {
-    const initialLoad = async () => {
-      const response = await fetch("http://localhost:4000/api/dashboard/initial-load", {
-        method: "GET",
-        headers: { "Content-Type": "application/json" }
-      });
-
-      const { mode, components } = await response.json();
-
-      const formattedComponents = components.map((component: any) => ({
-        title: component.title,
-        type: component.defaultType,
-        cols: component.cols,
-        recommededTypes: component.recommededTypes,
-        allTypes: component.allTypes,
-        data: component.data,
-      }));
-
-      setInitialLoadData(formattedComponents);
-    }
-
-    initialLoad();
-  }, []);
 
   return (
     <div className="bg-white rounded-xl pb-4 shadow">
@@ -172,8 +159,11 @@ const HomePageContent = () => {
           prompt={prompt}
           setPrompt={setPrompt}
           handlePromptSubmit={handlePromptSubmit}
-          loading={loading}
+          loading={isPending}
         />
+
+        {isLoading && <p>Loading dashboard data...</p>}
+        {error && <p className="text-red-500">Error fetching data: {error.message}</p>}
 
         <div className="grid grid-cols-12 gap-2">
           {components
@@ -201,12 +191,8 @@ const HomePageContent = () => {
               </React.Fragment>
             ))}
 
-
-          {initialLoadData && (
-            <InitialDynamicChart
-              initialLoadData={initialLoadData}
-            />
-          )}
+          <ReportDashboardExample />
+          {/* {initialLoadData && <InitialDynamicChart initialLoadData={initialLoadData} />} */}
         </div>
       </div>
     </div>
